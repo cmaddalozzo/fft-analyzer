@@ -3,9 +3,10 @@ import pyaudio
 import time, sys, math
 from collections import deque
 
-from src.utils import *
+from .utils import *
 
-class Stream_Reader:
+
+class PyAudioStreamReader:
     """
     The Stream_Reader continuously reads data from a selected sound source using PyAudio
 
@@ -17,19 +18,23 @@ class Stream_Reader:
 
     """
 
-    def __init__(self,
-        device = None,
-        rate = None,
-        updates_per_second  = 1000,
-        FFT_window_size = None,
-        verbose = False):
+    def __init__(
+        self,
+        device=None,
+        rate=None,
+        updates_per_second=1000,
+        FFT_window_size=None,
+        verbose=False,
+    ):
 
         self.rate = rate
         self.verbose = verbose
         self.pa = pyaudio.PyAudio()
 
-        #Temporary variables #hacks!
-        self.update_window_n_frames = 1024 #Don't remove this, needed for device testing!
+        # Temporary variables #hacks!
+        self.update_window_n_frames = (
+            1024  # Don't remove this, needed for device testing!
+        )
         self.data_buffer = None
 
         self.device = device
@@ -49,19 +54,31 @@ class Stream_Reader:
 
         self.stream = self.pa.open(
             input_device_index=self.device,
-            format = pyaudio.paInt16,
-            channels = 1,
-            rate = self.rate,
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=self.rate,
             input=True,
-            frames_per_buffer = self.update_window_n_frames,
-            stream_callback=self.non_blocking_stream_read)
+            frames_per_buffer=self.update_window_n_frames,
+            stream_callback=self.non_blocking_stream_read,
+        )
 
-        print("\n##################################################################################################")
+        print(
+            "\n##################################################################################################"
+        )
         print("\nDefaulted to using first working mic, Running on:")
         self.print_mic_info(self.device)
-        print("\n##################################################################################################")
-        print('Recording from %s at %d Hz\nUsing (non-overlapping) data-windows of %d samples (updating at %.2ffps)'
-            %(self.info["name"],self.rate, self.update_window_n_frames, self.updates_per_second))
+        print(
+            "\n##################################################################################################"
+        )
+        print(
+            "Recording from %s at %d Hz\nUsing (non-overlapping) data-windows of %d samples (updating at %.2ffps)"
+            % (
+                self.info["name"],
+                self.rate,
+                self.update_window_n_frames,
+                self.updates_per_second,
+            )
+        )
 
     def non_blocking_stream_read(self, in_data, frame_count, time_info, status):
         if self.verbose:
@@ -77,15 +94,19 @@ class Stream_Reader:
 
         return in_data, pyaudio.paContinue
 
-    def stream_start(self, data_windows_to_buffer = None):
+    def stream_start(self, data_windows_to_buffer=None):
         self.data_windows_to_buffer = data_windows_to_buffer
 
         if data_windows_to_buffer is None:
-            self.data_windows_to_buffer = int(self.updates_per_second / 2) #By default, buffer 0.5 second of audio
+            self.data_windows_to_buffer = int(
+                self.updates_per_second / 2
+            )  # By default, buffer 0.5 second of audio
         else:
             self.data_windows_to_buffer = data_windows_to_buffer
 
-        self.data_buffer = numpy_data_buffer(self.data_windows_to_buffer, self.update_window_n_frames)
+        self.data_buffer = numpy_data_buffer(
+            self.data_windows_to_buffer, self.update_window_n_frames
+        )
 
         print("\n-- Starting live audio stream...\n")
         self.stream.start_stream()
@@ -97,20 +118,23 @@ class Stream_Reader:
         self.stream.close()
         self.pa.terminate()
 
-    def valid_low_rate(self, device, test_rates = [44100, 22050]):
+    def valid_low_rate(self, device, test_rates=[44100, 22050]):
         """Set the rate to the lowest supported audio rate."""
         for testrate in test_rates:
             if self.test_device(device, rate=testrate):
                 return testrate
 
-        #If none of the test_rates worked, try the default rate:
+        # If none of the test_rates worked, try the default rate:
         self.info = self.pa.get_device_info_by_index(device)
         default_rate = int(self.info["defaultSampleRate"])
 
         if self.test_device(device, rate=default_rate):
             return default_rate
 
-        print("SOMETHING'S WRONG! I can't figure out a good sample-rate for DEVICE =>", device)
+        print(
+            "SOMETHING'S WRONG! I can't figure out a good sample-rate for DEVICE =>",
+            device,
+        )
         return default_rate
 
     def test_device(self, device, rate=None):
@@ -124,16 +148,17 @@ class Stream_Reader:
                 rate = int(self.info["defaultSampleRate"])
 
             stream = self.pa.open(
-                format = pyaudio.paInt16,
-                channels = 1,
+                format=pyaudio.paInt16,
+                channels=1,
                 input_device_index=device,
                 frames_per_buffer=self.update_window_n_frames,
-                rate = rate,
-                input = True)
+                rate=rate,
+                input=True,
+            )
             stream.close()
             return True
         except Exception as e:
-            #print(e)
+            # print(e)
             return False
 
     def input_device(self):
@@ -141,7 +166,7 @@ class Stream_Reader:
         See which devices can be opened for microphone input.
         Return the first valid device
         """
-        mics=[]
+        mics = []
         for device in range(self.pa.get_device_count()):
             if self.test_device(device):
                 mics.append(device)
@@ -158,6 +183,6 @@ class Stream_Reader:
 
     def print_mic_info(self, mic):
         mic_info = self.pa.get_device_info_by_index(mic)
-        print('\nMIC %s:' %(str(mic)))
+        print("\nMIC %s:" % (str(mic)))
         for k, v in sorted(mic_info.items()):
-            print("%s: %s" %(k, v))
+            print("%s: %s" % (k, v))
